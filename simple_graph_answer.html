@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>Homework 2 Graph</title>
+<style>
+  .link {
+    stroke: gray;
+    stroke-width: 1.5px;
+  }
+
+  .node {
+    fill: #66CC66;
+    stroke: #000;
+    stroke-width: 1px;
+  }
+
+  .node:hover {
+    fill: red;
+  }
+
+  #tooltip {
+    position: absolute;
+    width: auto;
+    height: auto;
+    padding: 3px;
+    background-color: khaki;
+    opacity: 0.8;
+    border-radius: 10px;
+    pointer-events: none;
+  }
+
+  #tooltip.hidden {
+    display: none;
+  }
+</style>
+<body>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+  <div id="tooltip" class="hidden">
+    <table>
+      <tr><td>SHA:</td><td><span id="sha"></span></td></tr>
+      <tr><td>Author:</td><td><span id="author"></span></td></tr>
+      <tr><td>Date:</td><td><span id="date"></span></td></tr>
+    </table>
+  </div>
+  <form>
+  X Scale:
+    <label><input type="radio" name="layout" value="index" checked> Index</label>
+    <label><input type="radio" name="layout" value="time" > Time</label>
+  </form>
+<script>
+
+var width = 900,
+    height = 700;
+
+var svg = d3.select("body").append("svg")
+            .attr("width", width)
+            .attr("height", height);
+
+var tooltip = d3.select("#tooltip");
+
+var fill = d3.scale.category10();
+
+var graph = {nodes:[], links:[]};
+
+d3.json('https://api.github.com/repos/Caleydo/caleydo/commits?token=73e3e28b248f05f7cdae75003424c2ab50deaef2', function(error, data) {
+  if (error) {
+    console.log(error);
+  } else {
+
+    // Map all data onto branches
+    var branches = {};
+    var nextCat = 0;
+
+    graph.nodes = data
+    graph.nodes.map(function(d, i) {
+      // Check if this SHA already has a branch number
+      if (d.sha in branches) {
+        d.cat = branches[d.sha]
+      } else {
+        d.cat = nextCat;
+        branches[d.sha] = nextCat;
+        nextCat += 1;
+      }
+      d.parents.map(function(dp, ip) {
+        // Determine branches for each parent
+        if (ip == 0) {
+          branches[dp.sha] = d.cat;
+        } else {
+          // Only make a new branch for this parent if we haven't seen this SHA
+          if (!dp.sha in branches) {
+            branches[dp.sha] = nextCat;
+            nextCat += 1;
+          }
+        }
+
+        // Create links between nodes and parents
+        graph.nodes.map(function(e, j) {
+          if (e.sha == dp.sha) {
+            graph.links.push({"source":d, "target": e});
+          }
+        })
+      })
+    });
+
+    var xMin = 0;
+    var xMax = graph.nodes.length - 1;
+    var yMin = 0;
+    var yMax = nextCat - 1;
+
+    var xScale = d3.scale.linear().domain([xMax, xMin]).range([20, width - 20]);
+    var yScale = d3.scale.linear().domain([yMin, yMax]).range([20, yMax * 30 + 20]);
+
+    var fill = d3.scale.category10();
+
+    // Generate the linear layout with categories
+
+    function line_cat_layout() {
+
+      graph.nodes.forEach(function(d, i) {
+        d.x = xScale(i);
+        d.y = yScale(d.cat);
+      })
+
+      graph_update(500);
+    }
+
+    function graph_update(delay) {
+
+      link.transition().duration(delay)
+          .attr("x1", function(d) { return d.target.x; })
+          .attr("y1", function(d) { return d.target.y; })
+          .attr("x2", function(d) { return d.source.x; })
+          .attr("y2", function(d) { return d.source.y; });
+
+      node.transition().duration(delay)
+          .attr("transform", function(d) { 
+            return "translate("+d.x+","+d.y+")"; 
+          });
+    }
+
+    // build the arrow.
+    svg.append("svg:defs").selectAll("marker")
+        .data(["end"])      // Different link/path types can be defined here
+      .enter().append("svg:marker")    // This section adds in the arrows
+        .attr("id", String)
+        .attr("viewBox", "0 -5 10 10")
+        .attr("refX", 15)
+        .attr("refY", -1.5)
+        .attr("markerWidth", 6)
+        .attr("markerHeight", 6)
+        .attr("orient", "auto")
+      .append("svg:path")
+        .attr("d", "M0,-5L10,0L0,5");
+
+    var link = svg.selectAll(".link")
+                  .data(graph.links)
+                .enter().append("line")
+                  .attr("class", "link")
+                  .attr("marker-end", "url(#end)");
+
+    var node = svg.selectAll(".node")
+                  .data(graph.nodes)
+                .enter()
+                  .append("g").attr("class", "node")
+                  .style("fill", function(d){ return fill(d.cat) });
+
+    node.append("circle")
+      .attr("r", 5)
+      .on("mouseover", function(d) {
+        // Empasize the current branch
+        node.select("circle")
+          .style("opacity", function(e) { return (d.cat == e.cat) ? 1.0 : 0.3 });
+
+        // Update the tooltip and display it
+        tooltip.select("#sha").text(d.sha);
+        tooltip.select("#author").text(d.commit.author.name + " <" + d.commit.author.email + ">");
+        tooltip.select("#date").text(d.commit.author.date);
+        tooltip
+          .style("left", (d.x + 10) + "px")
+          .style("top", (d.y + 30) + "px")
+          .classed("hidden", false);
+      })
+      .on("mouseout", function() {
+        tooltip.classed("hidden", true);
+        node.select("circle")
+          .style("opacity", 1.0);
+      });
+
+    line_cat_layout();
+  }
+});
+
+</script>
+</body>
+</html>
