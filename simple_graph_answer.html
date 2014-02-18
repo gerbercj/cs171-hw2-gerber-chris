@@ -56,7 +56,9 @@
 <script>
 
 var width = 900,
-    height = 700;
+    height = 700,
+    leftMargin = 30,
+    topMargin = 20;
 
 var svg = d3.select("body").append("svg")
             .attr("width", width)
@@ -68,7 +70,10 @@ var fill = d3.scale.category10();
 
 var graph = {nodes:[], links:[]};
 
-d3.json('https://api.github.com/repos/Caleydo/caleydo/commits?token=73e3e28b248f05f7cdae75003424c2ab50deaef2', function(error, data) {
+var githubProject = "https://api.github.com/repos/twbs/bootstrap/commits?per_page=100"
+var githubToken = "73e3e28b248f05f7cdae75003424c2ab50deaef2"
+
+d3.json(githubProject + "?token=" + githubToken, function(error, data) {
   if (error) {
     console.log(error);
   } else {
@@ -113,15 +118,15 @@ d3.json('https://api.github.com/repos/Caleydo/caleydo/commits?token=73e3e28b248f
     var xIndexMin = 0;
     var xIndexMax = graph.nodes.length - 1;
     // This range is backwards to put the newest commit on the right
-    var xIndexScale = d3.scale.linear().domain([xIndexMax, xIndexMin]).range([20, width - 20]);
+    var xIndexScale = d3.scale.linear().domain([xIndexMax, xIndexMin]).range([leftMargin, width - leftMargin]);
 
     var xDateMin = d3.min(data.map(commitDate));
     var xDateMax = d3.max(data.map(commitDate));
-    var xDateScale = d3.scale.linear().domain([xDateMin, xDateMax]).range([20, width - 20]);
+    var xDateScale = d3.scale.linear().domain([xDateMin, xDateMax]).range([leftMargin, width - leftMargin]);
 
     var yMin = 0;
     var yMax = nextCat - 1;
-    var yScale = d3.scale.linear().domain([yMin, yMax]).range([20, yMax * 30 + 20]);
+    var yScale = d3.scale.linear().domain([yMin, yMax]).range([topMargin, yMax * 24 - topMargin]);
 
     var yAxis = d3.svg.axis()
       .scale(yScale)
@@ -195,7 +200,7 @@ d3.json('https://api.github.com/repos/Caleydo/caleydo/commits?token=73e3e28b248f
     // Add the y-axis to label the branches
     svg.append("g")
       .classed("axis", true)
-      .attr("transform", "translate(20,0)")
+      .attr("transform", "translate(" + leftMargin + ",0)")
       .call(yAxis);
 
     node.append("circle")
