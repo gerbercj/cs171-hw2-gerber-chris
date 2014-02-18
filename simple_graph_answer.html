@@ -70,10 +70,10 @@ var fill = d3.scale.category10();
 
 var graph = {nodes:[], links:[]};
 
-var githubProject = "https://api.github.com/repos/twbs/bootstrap/commits?per_page=100"
+var githubProject = "https://api.github.com/repos/gerbercj/dotfiles/commits"
 var githubToken = "73e3e28b248f05f7cdae75003424c2ab50deaef2"
 
-d3.json(githubProject + "?token=" + githubToken, function(error, data) {
+d3.json(githubProject + "?per_page=100&access_token=" + githubToken, function(error, data) {
   if (error) {
     console.log(error);
   } else {
