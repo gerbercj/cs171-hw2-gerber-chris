@@ -3,6 +3,7 @@
 <title>Homework 2 Graph</title>
 <style>
   .link {
+    fill: none;
     stroke: gray;
     stroke-width: 1.5px;
   }
@@ -144,18 +145,20 @@ d3.json('https://api.github.com/repos/Caleydo/caleydo/commits?token=73e3e28b248f
       graph.nodes.forEach(function(d, i) {
         d.x = xIndexScale(i);
         d.y = yScale(d.cat);
-      })
+      });
 
       graph_update(500);
     }
 
+    var lineFunction = d3.svg.line()
+      .x(function(d) { return d.x; })
+      .y(function(d) { return d.y; })
+      .interpolate("step-after");
+
     function graph_update(delay) {
 
       link.transition().duration(delay)
-          .attr("x1", function(d) { return d.target.x; })
-          .attr("y1", function(d) { return d.target.y; })
-          .attr("x2", function(d) { return d.source.x; })
-          .attr("y2", function(d) { return d.source.y; });
+          .attr("d", function(d) { return lineFunction([d.target, d.source]); });
 
       node.transition().duration(delay)
           .attr("transform", function(d) { 
@@ -179,7 +182,7 @@ d3.json('https://api.github.com/repos/Caleydo/caleydo/commits?token=73e3e28b248f
 
     var link = svg.selectAll(".link")
                   .data(graph.links)
-                .enter().append("line")
+                .enter().append("path")
                   .attr("class", "link")
                   .attr("marker-end", "url(#end)");
 
