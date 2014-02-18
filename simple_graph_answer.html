@@ -17,6 +17,12 @@
     fill: red;
   }
 
+  .axis path,
+  .axis line {
+    fill: none;
+    stroke: none;
+  }
+
   #tooltip {
     position: absolute;
     width: auto;
@@ -116,6 +122,11 @@ d3.json('https://api.github.com/repos/Caleydo/caleydo/commits?token=73e3e28b248f
     var yMax = nextCat - 1;
     var yScale = d3.scale.linear().domain([yMin, yMax]).range([20, yMax * 30 + 20]);
 
+    var yAxis = d3.svg.axis()
+      .scale(yScale)
+      .ticks(yMax)
+      .orient("left");
+
     var form = d3.selectAll("input")
       .on("change", function(d, i) {
         graph.nodes.forEach(function(d, j) {
@@ -177,6 +188,12 @@ d3.json('https://api.github.com/repos/Caleydo/caleydo/commits?token=73e3e28b248f
                 .enter()
                   .append("g").attr("class", "node")
                   .style("fill", function(d){ return fill(d.cat) });
+
+    // Add the y-axis to label the branches
+    svg.append("g")
+      .classed("axis", true)
+      .attr("transform", "translate(20,0)")
+      .call(yAxis);
 
     node.append("circle")
       .attr("r", 5)
