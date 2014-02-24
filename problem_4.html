@@ -43,7 +43,7 @@
   </div>
 <script>
 
-// This visualization is based upon the example found here:
+// NOTE: This visualization is based upon the example found here:
 // http://bl.ocks.org/mbostock/4348373
 
 var width = 960,
@@ -77,12 +77,14 @@ var arc = d3.svg.arc()
   .innerRadius(function(d) { return Math.max(0, y(d.y)); })
   .outerRadius(function(d) { return Math.max(0, y(d.y + d.dy)); });
 
+// This section is configurable; I have left the token in for you to test with
 var githubRepo = "twbs/bootstrap"
 var githubToken = "73e3e28b248f05f7cdae75003424c2ab50deaef2"
 var githubRoot = "https://api.github.com/repos/" + githubRepo + "/"
 
 var root = {"label":"Repo", "name":githubRepo, "children":[]};
 
+// This is a semaphore used to detect when all callbacks have completed
 var callbacks = 1;
 
 function updateVis() {
@@ -99,6 +101,7 @@ function updateVis() {
     .on("mouseout", mouseout)
     .on("click", click);
 
+  // Add support for displaying tooltips
   function mouseover(d) {
     var coords = arc.centroid(d);
     tooltip.select("#label").text(d.label);
@@ -113,6 +116,7 @@ function updateVis() {
     tooltip.classed("hidden", true);
   }
 
+  // Zoom in and out!
   function click(d) {
     path.transition()
     .duration(750)
@@ -120,6 +124,7 @@ function updateVis() {
   }
 }
 
+// This massages the data from Github
 var mergeAuthors = function() {
   if (callbacks > 0) return;
 
@@ -146,6 +151,7 @@ var mergeAuthors = function() {
   updateVis();
 }
 
+// NOTE: This and the next function create the necessary closures
 function makeDetailCallback(commitNode) {
   callbacks += 1;
   return function(detailError, detailData) {
