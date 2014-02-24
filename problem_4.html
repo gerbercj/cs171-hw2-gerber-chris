@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>Github Zoomable Sunburst Visualization</title>
+<style>
+  path {
+    stroke: #fff;
+    fill-rule: evenodd;
+  }
+
+  th, td {
+    text-align: left;
+    vertical-align: top;
+    white-space: pre-line;
+  }
+
+  #tooltip {
+    position: absolute;
+    width: auto;
+    height: auto;
+    padding: 3px;
+    background-color: khaki;
+    opacity: 0.8;
+    border-radius: 10px;
+    pointer-events: none;
+    text-align: center;
+  }
+
+  #tooltip.hidden {
+    display: none;
+  }
+</style>
+<body>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+  <div id="tooltip" class="hidden">
+    <table>
+      <tbody>
+        <tr>
+          <th><span id="label"></span>: </th>
+          <td><span id="value"></span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+<script>
+
+// This visualization is based upon the example found here:
+// http://bl.ocks.org/mbostock/4348373
+
+var width = 960,
+    height = 700,
+    radius = Math.min(width, height) / 2;
+
+var x = d3.scale.linear()
+  .range([0, 2 * Math.PI]);
+
+var y = d3.scale.sqrt()
+  .range([0, radius]);
+
+var color = d3.scale.category20c();
+
+var svg = d3.select("body").append("svg")
+  .attr("width", width)
+  .attr("height", height)
+  .append("g")
+  .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")");
+
+var tooltip = d3.select("#tooltip")
+  .style("left", width / 2)
+  .style("top", height / 2);
+
+var partition = d3.layout.partition()
+  .value(function(d) { return d.size; });
+
+var arc = d3.svg.arc()
+  .startAngle(function(d) { return Math.max(0, Math.min(2 * Math.PI, x(d.x))); })
+  .endAngle(function(d) { return Math.max(0, Math.min(2 * Math.PI, x(d.x + d.dx))); })
+  .innerRadius(function(d) { return Math.max(0, y(d.y)); })
+  .outerRadius(function(d) { return Math.max(0, y(d.y + d.dy)); });
+
+var githubRepo = "twbs/bootstrap"
+var githubToken = "73e3e28b248f05f7cdae75003424c2ab50deaef2"
+var githubRoot = "https://api.github.com/repos/" + githubRepo + "/"
+
+var root = {"label":"Repo", "name":githubRepo, "children":[]};
+
+var callbacks = 1;
+
+function updateVis() {
+  // Bind the tree data to the visualization
+  var path = svg.selectAll("path")
+    .data(partition.nodes(root))
+    .enter().append("path")
+    .attr("d", arc)
+    .style("fill", function(d) {
+      return d.children ? color(d.name) :
+            (d.name == "additions") ? "green" : "red";
+    })
+    .on("mouseover", mouseover)
+    .on("mouseout", mouseout)
+    .on("click", click);
+
+  function mouseover(d) {
+    var coords = arc.centroid(d);
+    tooltip.select("#label").text(d.label);
+    tooltip.select("#value").text(("size" in d) ? d.size : d.name);
+    tooltip
+      .style("left", width / 2 + coords[0] + "px")
+      .style("top", height / 2 + coords[1] + "px")
+      .classed("hidden", false);
+  }
+
+  function mouseout(d) {
+    tooltip.classed("hidden", true);
+  }
+
+  function click(d) {
+    path.transition()
+    .duration(750)
+    .attrTween("d", arcTween(d));
+  }
+}
+
+var mergeAuthors = function() {
+  if (callbacks > 0) return;
+
+  // Deduplicate authors
+  root.children.forEach(function(branch) {
+    // Use a hash for deduping
+    var authors = {};
+
+    // Merge commits into single parent author
+    branch.children.forEach(function(author) {
+      if (authors[author.name]) {
+        authors[author.name].children = authors[author.name].children.concat(author.children);
+      } else {
+        authors[author.name] = author;
+      }
+    });
+
+    // Rebuild children from deduped hash
+    branch.children = Object.keys(authors).map(function(curr) {
+      return authors[curr];
+    });
+  });
+
+  updateVis();
+}
+
+function makeDetailCallback(commitNode) {
+  callbacks += 1;
+  return function(detailError, detailData) {
+    if (detailError) {
+      console.log(detailError);
+    } else {
+      // Add commit details data to tree
+      commitNode.children = [
+        { "label":"Added", "name":"additions", "size":detailData.stats.additions },
+        { "label":"Deleted", "name":"deletions", "size":detailData.stats.deletions }
+      ];
+    }
+    callbacks -= 1;
+    mergeAuthors();
+  };
+}
+
+function makeCommitCallback(branchNode) {
+  callbacks += 1;
+  return function(commitError, commitData) {
+    if (commitError) {
+      console.log(commitError);
+    } else {
+      // Add commit data to tree
+      commitData.map(function(c) {
+        branchNode.children.push(authorNode = {
+          "label":"Author",
+          "name":c.commit.author.name,
+          "children":[]
+        });
+        authorNode.children.push(commitNode = {
+          "label":"Commit Message",
+          "name":c.commit.message
+        });
+
+        // Get commit details
+        d3.json(githubRoot + "commits/" + c.sha + "?access_token=" + githubToken, makeDetailCallback(commitNode));
+      });
+    }
+    callbacks -= 1;
+  };
+}
+
+d3.json(githubRoot + "branches?per_page=100&access_token=" + githubToken, function(branchError, branchData) {
+  if (branchError) {
+    console.log(branchError);
+  } else {
+    // Add branch data to tree
+    branchData.map(function(b) {
+      root.children.push(branchNode = {
+        "label":"Branch",
+        "name":b.name,
+        "children":[]
+      });
+
+      // Get commit data
+      d3.json(githubRoot + "commits?sha=" + b.commit.sha + "&per_page=100&access_token=" + githubToken, makeCommitCallback(branchNode));
+    });
+  }
+  callbacks -= 1;
+});
+
+d3.select(self.frameElement).style("height", height + "px");
+
+function arcTween(d) {
+  var xd = d3.interpolate(x.domain(), [d.x, d.x + d.dx]),
+      yd = d3.interpolate(y.domain(), [d.y, 1]),
+      yr = d3.interpolate(y.range(), [d.y ? 20 : 0, radius]);
+  return function(d, i) {
+    return i
+      ? function(t) { return arc(d); }
+    : function(t) { x.domain(xd(t)); y.domain(yd(t)).range(yr(t)); return arc(d); };
+  };
+}
+
+</script>
+</body>
+</html>
